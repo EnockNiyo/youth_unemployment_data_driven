@@ -27,6 +27,9 @@ numerize>=0.12
 # Statistical Analysis
 statsmodels>=0.14.0
 
+# API and HTTP Requests (NEW - for real data fetching)
+requests>=2.31.0
+
 # Additional Dependencies
 # These are automatically installed as dependencies of the above packages
 # but listed here for completeness:
