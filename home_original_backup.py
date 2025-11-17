@@ -16,19 +16,8 @@ import numpy as np
 import plotly.graph_objects as go
 from sklearn.metrics import classification_report, accuracy_score
 # from statsmodels.tsa.arima.model import ARIMA
-
 # Set up Streamlit layout
 st.set_page_config(page_title="Youth Unemployment Analytics Dashboard", page_icon="📊", layout="wide")
-
-# NEW: Import enhanced features
-from app_integration import (
-    initialize_app,
-    display_enhanced_sidebar,
-    get_enhanced_menu_function
-)
-
-# NEW: Initialize enhanced features (authentication, real data, contributions)
-initialize_app()
 # Load datasets
 file_path = "nisr_dataset.csv"  # Replace with your actual file path
 
@@ -72,21 +61,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# NEW: Enhanced Sidebar with Authentication
-selected_page = display_enhanced_sidebar()
-
-# Get page function for enhanced features
-page_function = get_enhanced_menu_function(selected_page)
-
-# If special enhanced page is selected, display it and stop original dashboard
-if page_function is not None and callable(page_function):
-    page_function()
-    st.stop()
-
-# Sidebar Filters (for original dashboard pages)
-st.sidebar.markdown("---")
-st.sidebar.header("📊 Dashboard Filters")
-age_range = st.sidebar.slider("Select Age Range", 16, 35, (16, 35))  # Extended to 35
+# Sidebar Filters
+st.sidebar.header("Filters")
+age_range = st.sidebar.slider("Select Age Range", 16, 30, (16, 30))
 gender = st.sidebar.selectbox("Select Gender", ["All", "Male", "Female"])
 regions = st.sidebar.multiselect("Select Region(s)", options=df['region'].unique(), default=df['region'].unique())
 education_levels = st.sidebar.multiselect("Select Education Level(s)", options=df['education_level'].unique(),
@@ -284,10 +261,6 @@ def future_predictions():
 
 
 def forecasting(df, years_to_predict):
-    """
-    Enhanced forecasting with confidence intervals and trend analysis
-    Supports age range up to 35
-    """
     # Calculate probabilities from historical data
     prob_outcome = df['employment_outcome'].value_counts(normalize=True)
 
@@ -298,216 +271,76 @@ def forecasting(df, years_to_predict):
         .unstack(fill_value=0)
     )
 
-    # Enhanced: Run multiple simulations for confidence intervals
-    num_simulations = 100
-    all_simulations = []
+    # Simulate future predictions
+    future_years = list(range(1, years_to_predict + 1))
+    predictions = []
 
-    for sim in range(num_simulations):
-        # Simulate future predictions
-        future_years = list(range(1, years_to_predict + 1))
-        predictions = []
+    for year in future_years:
+        future_data = []
+        for _, row in df.iterrows():
+            edu_level = row['education_level']
+            if edu_level in conditional_probs.index:
+                prob = conditional_probs.loc[edu_level]
+            else:
+                prob = prob_outcome
 
-        for year in future_years:
-            future_data = []
-            for _, row in df.iterrows():
-                edu_level = row['education_level']
-                if edu_level in conditional_probs.index:
-                    prob = conditional_probs.loc[edu_level]
-                else:
-                    prob = prob_outcome
+            # Simulate outcome based on probabilities
+            outcome = np.random.choice(prob.index, p=prob.values)
+            future_data.append(outcome)
 
-                # Simulate outcome based on probabilities
-                outcome = np.random.choice(prob.index, p=prob.values)
-                future_data.append(outcome)
+        predictions.append(pd.Series(future_data).value_counts())
 
-            predictions.append(pd.Series(future_data).value_counts())
-
-        all_simulations.append(pd.DataFrame(predictions, index=future_years).fillna(0))
-
-    # Calculate mean prediction and confidence intervals
-    prediction_summary = pd.concat(all_simulations).groupby(level=0).mean()
-    prediction_lower = pd.concat(all_simulations).groupby(level=0).quantile(0.1)
-    prediction_upper = pd.concat(all_simulations).groupby(level=0).quantile(0.9)
-
+    # Aggregate predictions
+    prediction_summary = pd.DataFrame(predictions, index=future_years).fillna(0)
     prediction_summary.index.name = "Year"
-
-    # Display predictions with enhanced visualizations
-    st.write("### 📈 Enhanced Future Employment Predictions")
-
-    # Key metrics row
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1:
-        current_unemployment = (df['employment_outcome'] == False).mean() * 100
-        st.metric("Current Unemployment", f"{current_unemployment:.1f}%")
-    with col_m2:
-        if False in prediction_summary.columns:
-            future_unemployment = (prediction_summary[False].iloc[-1] / prediction_summary.iloc[-1].sum()) * 100
-            st.metric(f"Year {years_to_predict} Forecast", f"{future_unemployment:.1f}%",
-                     delta=f"{future_unemployment - current_unemployment:.1f}%")
-        else:
-            st.metric(f"Year {years_to_predict} Forecast", "N/A")
-    with col_m3:
-        total_youth = len(df)
-        st.metric("Sample Size", f"{total_youth:,}")
-    with col_m4:
-        confidence = "90%"
-        st.metric("Confidence Interval", confidence)
-
-    st.markdown("---")
-
     forcast1, forecast2 = st.columns(2)
-
     # Plot Results
     with forcast1:
+
         st.write("### Future Employment Outcome Predictions")
-
-        # Enhanced bar chart with plotly
-        fig_forecast = go.Figure()
-
-        if True in prediction_summary.columns:
-            fig_forecast.add_trace(go.Bar(
-                name='Employed',
-                x=prediction_summary.index,
-                y=prediction_summary[True],
-                marker_color='green'
-            ))
-
-        if False in prediction_summary.columns:
-            fig_forecast.add_trace(go.Bar(
-                name='Unemployed',
-                x=prediction_summary.index,
-                y=prediction_summary[False],
-                marker_color='red'
-            ))
-
-        fig_forecast.update_layout(
-            barmode='stack',
-            title='Employment Outcome Forecast by Year',
-            xaxis_title='Year',
-            yaxis_title='Count',
-            height=350
-        )
-        st.plotly_chart(fig_forecast, use_container_width=True)
-
-        # Unemployment by Education Level
+        st.bar_chart(prediction_summary)
+        # New Feature: Unemployment by Education Level
         st.write("### Unemployment by Education Level")
         edu_unemployment = df[df['employment_outcome'] == 0]['education_level'].value_counts()
         fig_unemployment = px.pie(
             values=edu_unemployment.values,
             names=edu_unemployment.index,
-            title="Current Unemployment Distribution by Education Level",
-            hole=0.3
+            title="Forecast Unemployment Distribution by Education Level"
         )
-        st.plotly_chart(fig_unemployment, use_container_width=True)
-
+        st.plotly_chart(fig_unemployment)
     with forecast2:
-        # Unemployment rate trend
-        st.write("### Unemployment Rate Trend")
-        unemployment_rate_trend = []
-        for year in prediction_summary.index:
-            if False in prediction_summary.columns:
-                total = prediction_summary.loc[year].sum()
-                unemp_rate = (prediction_summary.loc[year, False] / total) * 100 if total > 0 else 0
-                unemployment_rate_trend.append(unemp_rate)
-            else:
-                unemployment_rate_trend.append(0)
-
-        fig_trend = go.Figure()
-        fig_trend.add_trace(go.Scatter(
-            x=list(prediction_summary.index),
-            y=unemployment_rate_trend,
-            mode='lines+markers',
-            name='Unemployment Rate',
-            line=dict(color='red', width=3),
-            marker=dict(size=8)
-        ))
-
-        # Add confidence interval
-        if False in prediction_lower.columns and False in prediction_upper.columns:
-            lower_rate = [(prediction_lower.loc[year, False] / prediction_lower.loc[year].sum()) * 100
-                         for year in prediction_lower.index]
-            upper_rate = [(prediction_upper.loc[year, False] / prediction_upper.loc[year].sum()) * 100
-                         for year in prediction_upper.index]
-
-            fig_trend.add_trace(go.Scatter(
-                x=list(prediction_summary.index) + list(reversed(prediction_summary.index)),
-                y=lower_rate + list(reversed(upper_rate)),
-                fill='toself',
-                fillcolor='rgba(255,0,0,0.2)',
-                line=dict(color='rgba(255,255,255,0)'),
-                showlegend=True,
-                name='90% Confidence Interval'
-            ))
-
-        fig_trend.update_layout(
-            title='Unemployment Rate Forecast with Confidence Interval',
-            xaxis_title='Year',
-            yaxis_title='Unemployment Rate (%)',
-            height=350
-        )
-        st.plotly_chart(fig_trend, use_container_width=True)
-
-        # Employment Sectors by Education Level
+        # New Feature: Employment Sectors by Education Level
         st.write("### Employment Sectors by Education Level")
         sector_education = df.groupby('education_level')['current_employment_sector'].value_counts().unstack().fillna(0)
         fig_sector_education = px.bar(
             sector_education,
-            title="Current Employment Sectors by Education Level",
+            title="Employment Sectors by Education Level",
             labels={'value': 'Count', 'education_level': 'Education Level'},
-            barmode='stack',
-            height=350
+            barmode='stack'
         )
-        st.plotly_chart(fig_sector_education, use_container_width=True)
+        st.plotly_chart(fig_sector_education)
 
-    # Additional analysis section
-    st.markdown("---")
-    st.write("### 🎯 Sector Employment Trends")
-
+    # New Feature: Current Employment Sector by Education Level
+    st.write("### Current Employment Sector by Education Level")
     current_sector = df.groupby('education_level')['current_employment_sector'].value_counts(
         normalize=True).unstack().fillna(0)
     fig_current_sector = px.line(
         current_sector.T,
-        title="Employment Sector Distribution by Education Level",
-        labels={'value': 'Proportion', 'current_employment_sector': 'Employment Sector'},
-        height=400
+        title="Current Employment Sector Trends by Education Level",
+        labels={'value': 'Proportion', 'current_employment_sector': 'Employment Sector'}
     )
-    st.plotly_chart(fig_current_sector, use_container_width=True)
-
-    # Key insights
-    with st.expander("📊 Key Insights & Recommendations"):
-        st.write("**Current Situation:**")
-        st.write(f"- Total youth in sample: {len(df):,} (age 16-35)")
-        st.write(f"- Current unemployment rate: {current_unemployment:.1f}%")
-
-        if unemployment_rate_trend:
-            trend_change = unemployment_rate_trend[-1] - unemployment_rate_trend[0]
-            trend_direction = "increase" if trend_change > 0 else "decrease"
-            st.write(f"- Projected {trend_direction} of {abs(trend_change):.1f}% over {years_to_predict} years")
-
-        st.write("\n**Recommendations:**")
-        # Find education level with highest unemployment
-        if len(edu_unemployment) > 0:
-            highest_unemp_edu = edu_unemployment.idxmax()
-            st.write(f"- Focus interventions on {highest_unemp_edu} education level")
-
-        st.write("- Enhance digital and technical skills training")
-        st.write("- Strengthen job placement programs")
-        st.write("- Promote entrepreneurship and self-employment")
+    st.plotly_chart(fig_current_sector)
 
 
-# Sidebar navigation (integrated with enhanced sidebar above)
-# The enhanced sidebar already handles navigation, so we map selected_page to old options
-def map_selected_page(selected_page):
-    """Map enhanced sidebar selection to original page names"""
-    if "Home" in selected_page or "Dashboard" in selected_page:
-        return "Home"
-    elif "Future Predictions" in selected_page:
-        return "Future Predictions"
-    else:
-        return "Home"  # Default to Home
+# Sidebar navigation
+def sideBar():
+    with st.sidebar:
+        selected = st.selectbox("Main Menu", ["Home", "Future Predictions"])
+        return selected
 
-# Get selected option from enhanced sidebar
-selected_option = map_selected_page(selected_page)
+
+# Run the sidebar
+selected_option = sideBar()
 
 # Main Content
 if selected_option == "Home":
@@ -717,7 +550,7 @@ with tabs[0]:
     # Demographics columns for layout
     dem1, dem2 = st.columns(2, gap='small')
 
-    # Age Distribution by Age (now supports 16-35)
+    # Age Distribution by Age (now supports 16-30)
     age_gender_counts = filtered_df.groupby("age").size().reset_index(name="count")
     age_gender_counts = age_gender_counts.sort_values("age")
     with dem1:
@@ -1009,12 +842,12 @@ if df is not None and dfs is not None:
             forecast_years = st.slider('Select Number of Years for Forecasting', min_value=1, max_value=10, value=5,
                                        key="forecast_slider")
 
-            # Simulate aging over the forecasted years (age capped to the range 16 to 35)
+            # Simulate aging over the forecasted years (age capped to the range 16 to 30)
             future_data = X.copy()
             future_data['age'] = future_data['age'] + forecast_years  # Increase age by forecast years
 
-            # Cap age to the range 16-35
-            future_data['age'] = np.clip(future_data['age'], 16, 35)  # Ensure age is between 16 and 35
+            # Cap age to the range 16-30
+            future_data['age'] = np.clip(future_data['age'], 16, 30)  # Ensure age is between 16 and 30
 
             # Predict future unemployment status
             future_predictions = model.predict(future_data)
@@ -1423,8 +1256,8 @@ with tabs[2]:
     st.markdown('<div class="chart-title">Income Distribution by Age and Sector</div>', unsafe_allow_html=True)
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     # st.markdown('<p class="metric-header">Income Distribution by Age and Sector</p>', unsafe_allow_html=True)
-    age_bins = [16, 20, 25, 30, 35]
-    age_labels = ["16-19", "20-24", "25-29", "30-35"]
+    age_bins = [16, 20, 25, 30]
+    age_labels = ["16-19", "20-24", "25-30"]
     filtered_df["age_group"] = pd.cut(filtered_df["age"], bins=age_bins, labels=age_labels, right=True)
 
     age_income_fig = px.box(
