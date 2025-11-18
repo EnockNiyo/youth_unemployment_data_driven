@@ -37,8 +37,9 @@ initialize_app()
 if not require_authentication():
     st.stop()  # Stop execution if not authenticated
 
-# Display logout button in sidebar
-display_logout_button()
+# ✅ REMOVED DUPLICATE LOGOUT BUTTON CALL
+# The display_enhanced_sidebar() already handles logout functionality
+
 # Load datasets
 file_path = "nisr_dataset.csv"  # Replace with your actual file path
 
@@ -878,7 +879,7 @@ if dfs is not None:
         avg_growth_rate = district_data['growth_rate'].mean()
 
         # Add a progress bar to select the number of years to forecast
-        forecast_years = st.slider('Select Number of Years to Forecast', min_value=1, max_value=10, value=5)
+        forecast_years = st.slider('Select Number of Years to Forecast', min_value=1, max_value=10, value=5, key='forecast_years_slider_1')
         st.write(f"Forecasting for {forecast_years} years...")
 
         # Initialize an empty DataFrame to store the forecasted data for all districts
@@ -1017,7 +1018,7 @@ if df is not None and dfs is not None:
 
             # Add a unique key to the slider to avoid duplicate element ID issues
             forecast_years = st.slider('Select Number of Years for Forecasting', min_value=1, max_value=10, value=5,
-                                       key="forecast_slider")
+                                       key="forecast_slider_unemployment")
 
             # Simulate aging over the forecasted years (age capped to the range 16 to 35)
             future_data = X.copy()
