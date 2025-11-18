@@ -26,9 +26,19 @@ from app_integration import (
     display_enhanced_sidebar,
     get_enhanced_menu_function
 )
+from auth_gate import require_authentication, display_logout_button
+from professional_forecasting import display_professional_forecasting
+from interactive_real_data_viz import display_interactive_real_data_dashboard
 
 # NEW: Initialize enhanced features (authentication, real data, contributions)
 initialize_app()
+
+# NEW: AUTHENTICATION GATE - Require login before dashboard access
+if not require_authentication():
+    st.stop()  # Stop execution if not authenticated
+
+# Display logout button in sidebar
+display_logout_button()
 # Load datasets
 file_path = "nisr_dataset.csv"  # Replace with your actual file path
 
@@ -515,16 +525,16 @@ if selected_option == "Home":
 
 
 elif selected_option == "Future Predictions":
-    st.subheader("Future Predictions")
+    # Professional ML-based forecasting
+    st.sidebar.markdown("---")
+    years_to_predict = st.sidebar.slider("Forecast Years", 1, 10, 5,
+                                        help="Number of years to forecast into the future")
 
-    # Add a slider to select the number of years to predict
-    years_to_predict = st.slider("Select the number of years to predict", 1, 10, 3)
-
-    # Use the provided dataset
-    if 'filtered_df' in globals():
-        forecasting(filtered_df, years_to_predict)
+    # Use professional forecasting with ML models
+    if 'filtered_df' in globals() and len(filtered_df) > 0:
+        display_professional_forecasting(filtered_df, years_to_predict)
     else:
-        st.error("Please provide a valid dataset in the variable `filtered_df`.")
+        st.error("⚠️ No data available for forecasting. Please check filters.")
 
 
 # Calculate the metrics

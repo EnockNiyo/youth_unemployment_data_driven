@@ -8,9 +8,10 @@ import sys
 import os
 
 # Import our new modules
-from data_sources import RealDataFetcher, DataQualityChecker, display_real_data_dashboard
+from data_sources import RealDataFetcher, DataQualityChecker
 from user_management import UserDatabase, AuthenticationUI, display_user_sidebar
 from data_contribution import DataContribution
+from interactive_real_data_viz import display_interactive_real_data_dashboard
 
 
 def initialize_app():
@@ -78,11 +79,8 @@ def display_enhanced_sidebar():
 
 
 def display_real_data_page():
-    """Display real-time data from international sources"""
-    st.title("🌍 Real-Time Data Sources")
-    st.markdown("---")
-
-    display_real_data_dashboard()
+    """Display real-time data from international sources with interactive visualizations"""
+    display_interactive_real_data_dashboard()
 
 
 def display_contribution_page():
