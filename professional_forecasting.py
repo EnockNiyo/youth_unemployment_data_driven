@@ -91,6 +91,7 @@ class ProfessionalForecaster:
         finite_mask = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
         if not finite_mask.any():
             # No valid training data - fallback: repeat last known value
+            print("[ProfessionalForecaster] FALLBACK: no finite training rows found; returning persistence forecast")
             future_years = [ts_data['year'].iloc[-1] + i for i in range(1, years_to_predict + 1)]
             fallback = [float(ts_data['unemployment_rate'].iloc[-1])] * years_to_predict
             self.predictions = {'Random Forest': fallback, 'Gradient Boosting': fallback,
@@ -105,6 +106,7 @@ class ProfessionalForecaster:
 
         # If we don't have enough samples to train complex models, fallback to persistence
         if len(X) < 3:
+            print(f"[ProfessionalForecaster] FALLBACK: too few training samples ({len(X)}); returning persistence forecast")
             future_years = [ts_data['year'].iloc[-1] + i for i in range(1, years_to_predict + 1)]
             fallback = [float(ts_data['unemployment_rate'].iloc[-1])] * years_to_predict
             self.predictions = {'Random Forest': fallback, 'Gradient Boosting': fallback,
