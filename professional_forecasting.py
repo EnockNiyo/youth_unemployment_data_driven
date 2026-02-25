@@ -215,6 +215,7 @@ class ProfessionalForecaster:
 
         for edu_level in self.data['education_level'].unique():
             edu_data = self.data[self.data['education_level'] == edu_level]
+            print(f"[ProfessionalForecaster] education_level={edu_level!r} rows={len(edu_data)}")
 
             if len(edu_data) > 10:  # Need enough data
                 forecaster = ProfessionalForecaster(edu_data)
@@ -223,6 +224,8 @@ class ProfessionalForecaster:
                     'predictions': preds['Ensemble'],
                     'years': years
                 }
+            else:
+                print(f"[ProfessionalForecaster] SKIP education_level={edu_level!r} (insufficient rows={len(edu_data)})")
 
         return education_forecasts
 
