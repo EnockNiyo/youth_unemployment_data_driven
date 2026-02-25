@@ -83,6 +83,36 @@ class ProfessionalForecaster:
         X = ts_data[features].values
         y = ts_data['unemployment_rate'].values
 
+        # Ensure numeric types and finite values for sklearn
+        X = np.asarray(X, dtype=float)
+        y = np.asarray(y, dtype=float)
+
+        # Remove rows with non-finite values
+        finite_mask = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+        if not finite_mask.any():
+            # No valid training data - fallback: repeat last known value
+            future_years = [ts_data['year'].iloc[-1] + i for i in range(1, years_to_predict + 1)]
+            fallback = [float(ts_data['unemployment_rate'].iloc[-1])] * years_to_predict
+            self.predictions = {'Random Forest': fallback, 'Gradient Boosting': fallback,
+                                'Linear Regression': fallback, 'Ensemble': fallback}
+            self.future_years = future_years
+            self.historical_data = ts_data
+            return self.predictions, self.future_years
+
+        if not finite_mask.all():
+            X = X[finite_mask]
+            y = y[finite_mask]
+
+        # If we don't have enough samples to train complex models, fallback to persistence
+        if len(X) < 3:
+            future_years = [ts_data['year'].iloc[-1] + i for i in range(1, years_to_predict + 1)]
+            fallback = [float(ts_data['unemployment_rate'].iloc[-1])] * years_to_predict
+            self.predictions = {'Random Forest': fallback, 'Gradient Boosting': fallback,
+                                'Linear Regression': fallback, 'Ensemble': fallback}
+            self.future_years = future_years
+            self.historical_data = ts_data
+            return self.predictions, self.future_years
+
         # Train multiple models
         models = {
             'Random Forest': RandomForestRegressor(n_estimators=100, random_state=42),
