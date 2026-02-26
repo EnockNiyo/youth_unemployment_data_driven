@@ -91,7 +91,6 @@ class ProfessionalForecaster:
         finite_mask = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
         if not finite_mask.any():
             # No valid training data - fallback: repeat last known value
-            print("[ProfessionalForecaster] FALLBACK: no finite training rows found; returning persistence forecast")
             future_years = [ts_data['year'].iloc[-1] + i for i in range(1, years_to_predict + 1)]
             fallback = [float(ts_data['unemployment_rate'].iloc[-1])] * years_to_predict
             self.predictions = {'Random Forest': fallback, 'Gradient Boosting': fallback,
@@ -106,7 +105,6 @@ class ProfessionalForecaster:
 
         # If we don't have enough samples to train complex models, fallback to persistence
         if len(X) < 3:
-            print(f"[ProfessionalForecaster] FALLBACK: too few training samples ({len(X)}); returning persistence forecast")
             future_years = [ts_data['year'].iloc[-1] + i for i in range(1, years_to_predict + 1)]
             fallback = [float(ts_data['unemployment_rate'].iloc[-1])] * years_to_predict
             self.predictions = {'Random Forest': fallback, 'Gradient Boosting': fallback,
@@ -215,7 +213,6 @@ class ProfessionalForecaster:
 
         for edu_level in self.data['education_level'].unique():
             edu_data = self.data[self.data['education_level'] == edu_level]
-            print(f"[ProfessionalForecaster] education_level={edu_level!r} rows={len(edu_data)}")
 
             if len(edu_data) > 10:  # Need enough data
                 forecaster = ProfessionalForecaster(edu_data)
@@ -224,8 +221,6 @@ class ProfessionalForecaster:
                     'predictions': preds['Ensemble'],
                     'years': years
                 }
-            else:
-                print(f"[ProfessionalForecaster] SKIP education_level={edu_level!r} (insufficient rows={len(edu_data)})")
 
         return education_forecasts
 

@@ -6,6 +6,27 @@ This module adds real data sources and user management to the application
 import streamlit as st
 import sys
 import os
+import json
+import pandas as pd
+
+# Compatibility helper for Streamlit rerun (some Streamlit versions removed experimental_rerun)
+def safe_rerun():
+    try:
+        # Preferred for older/newer versions if available
+        if hasattr(st, 'experimental_rerun'):
+            st.experimental_rerun()
+            return
+        if hasattr(st, 'rerun'):
+            st.rerun()
+            return
+    except Exception:
+        pass
+
+    # Final fallback: stop execution (user will need to interact to rerun)
+    try:
+        st.stop()
+    except Exception:
+        return
 
 # Import our new modules
 from data_sources import RealDataFetcher, DataQualityChecker
@@ -155,6 +176,157 @@ def display_admin_panel():
         import pandas as pd
         role_df = pd.DataFrame(list(users_by_role.items()), columns=['Role', 'Count'])
         st.bar_chart(role_df.set_index('Role'))
+
+    st.markdown("---")
+    st.subheader("User Management")
+
+    # Fetch all users and allow admin to export
+    users = st.session_state.db.get_all_users()
+    if users:
+        users_df = pd.DataFrame(users)
+
+        # Filters
+        roles = sorted(users_df['role'].dropna().unique().tolist())
+        selected_roles = st.multiselect("Filter by role", options=roles, default=roles)
+        active_only = st.checkbox("Active users only", value=True)
+
+        filtered = users_df[users_df['role'].isin(selected_roles)]
+        if active_only:
+            filtered = filtered[filtered['is_active'] == True]
+
+        st.dataframe(filtered.drop(columns=['is_active']))
+
+        csv = filtered.to_csv(index=False).encode('utf-8')
+        st.download_button("Export Users CSV", data=csv, file_name="users_report.csv", mime="text/csv")
+    else:
+        st.info("No users found in the database.")
+
+    st.markdown("---")
+    st.subheader("Contributions")
+
+    contributions = st.session_state.db.get_all_contributions()
+    if contributions:
+        contrib_df = pd.DataFrame(contributions)
+
+        # Show data column as JSON string for table display
+        contrib_df_display = contrib_df.copy()
+        contrib_df_display['data'] = contrib_df_display['data'].apply(lambda x: json.dumps(x, ensure_ascii=False))
+
+        status_opts = sorted(contrib_df_display['status'].dropna().unique().tolist())
+        sel_status = st.multiselect("Filter by status", options=status_opts, default=status_opts)
+
+        filtered_contrib = contrib_df_display[contrib_df_display['status'].isin(sel_status)]
+
+        st.dataframe(filtered_contrib)
+
+        csvc = filtered_contrib.to_csv(index=False).encode('utf-8')
+        st.download_button("Export Contributions CSV", data=csvc, file_name="contributions_report.csv", mime="text/csv")
+
+        st.markdown("---")
+        st.subheader("Manage Contribution Status")
+
+        # Provide a simple editor: choose an ID, view details, change status
+        try:
+            contrib_ids = contrib_df['id'].tolist()
+        except Exception:
+            contrib_ids = []
+
+        if contrib_ids:
+            selected_id = st.selectbox("Select Contribution ID to edit", options=contrib_ids)
+
+            # Find the original row (with parsed data)
+            selected_row = None
+            try:
+                selected_row = contrib_df[contrib_df['id'] == selected_id].iloc[0]
+            except Exception:
+                selected_row = None
+
+            if selected_row is not None:
+                st.write("**Submitted by:**", selected_row.get('username'))
+                st.write("**Full name:**", selected_row.get('full_name'))
+                st.write("**Type:**", selected_row.get('type'))
+                st.write("**Submitted at:**", selected_row.get('submitted_at'))
+                st.write("**Current status:**", selected_row.get('status'))
+                st.write("**Data:**")
+                st.json(selected_row.get('data'))
+
+                status_options = ["pending", "approved", "rejected"]
+                current_index = 0
+                try:
+                    current_index = status_options.index(selected_row.get('status'))
+                except Exception:
+                    current_index = 0
+
+                new_status = st.selectbox("New status", options=status_options, index=current_index)
+
+                if st.button("Update Status"):
+                    ok = st.session_state.db.update_contribution_status(selected_id, new_status)
+                    if ok:
+                        st.success(f"Contribution {selected_id} status updated to {new_status}")
+                        safe_rerun()
+                    else:
+                        st.error("Failed to update contribution status")
+        else:
+            st.info("No contribution IDs available to edit.")
+    else:
+        st.info("No contributions found.")
+
+    st.markdown("---")
+    st.subheader("Manage Users")
+
+    all_users = st.session_state.db.get_all_users()
+    if all_users:
+        users_df = pd.DataFrame(all_users)
+
+        try:
+            user_ids = users_df['id'].tolist()
+        except Exception:
+            user_ids = []
+
+        if user_ids:
+            selected_user_id = st.selectbox("Select User ID to edit", options=user_ids)
+            selected_user = None
+            try:
+                selected_user = users_df[users_df['id'] == selected_user_id].iloc[0].to_dict()
+            except Exception:
+                selected_user = None
+
+            if selected_user is not None:
+                st.write("**Username:**", selected_user.get('username'))
+                st.write("**Created At:**", selected_user.get('created_at'))
+
+                with st.form("edit_user_form"):
+                    full_name = st.text_input("Full Name", value=selected_user.get('full_name') or "")
+                    email = st.text_input("Email", value=selected_user.get('email') or "")
+                    role = st.selectbox("Role", options=["user", "researcher", "policymaker", "admin", "Local government official", "Private sector (Employer)", "Education (Vocational officer)", "NGO representative"], index=0 if not selected_user.get('role') else ["user", "researcher", "policymaker", "admin", "Local government official", "Private sector (Employer)", "Education (Vocational officer)", "NGO representative"].index(selected_user.get('role')) if selected_user.get('role') in ["user", "researcher", "policymaker", "admin", "Local government official", "Private sector (Employer)", "Education (Vocational officer)", "NGO representative"] else 0)
+                    organization = st.text_input("Organization", value=selected_user.get('organization') or "")
+                    phone = st.text_input("Phone", value=selected_user.get('phone') or "")
+                    region = st.selectbox("Region", options=["", "Kigali", "Northern", "Southern", "Eastern", "Western"], index=0 if not selected_user.get('region') else ["", "Kigali", "Northern", "Southern", "Eastern", "Western"].index(selected_user.get('region')) if selected_user.get('region') in ["", "Kigali", "Northern", "Southern", "Eastern", "Western"] else 0)
+                    is_active = st.checkbox("Active", value=bool(selected_user.get('is_active')))
+
+                    submit_user = st.form_submit_button("Update User")
+
+                    if submit_user:
+                        updates = {
+                            'full_name': full_name,
+                            'email': email,
+                            'role': role,
+                            'organization': organization,
+                            'phone': phone,
+                            'region': region,
+                            'is_active': 1 if is_active else 0
+                        }
+
+                        ok = st.session_state.db.update_user_profile(selected_user_id, updates)
+                        if ok:
+                            st.success(f"User {selected_user.get('username')} updated")
+                            safe_rerun()
+                        else:
+                            st.error("Failed to update user")
+        else:
+            st.info("No user IDs available to edit.")
+    else:
+        st.info("No users found to manage.")
 
 
 def display_user_statistics():

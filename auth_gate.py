@@ -125,7 +125,7 @@ def display_login_gate():
     # Footer
     st.markdown("""
         <div style="text-align: center; color: #666; padding: 2rem;">
-            <p><strong>Powered by NexGen Solution</strong></p>
+            <p><strong>Powered by Joshua Imanishimwe 2026</strong></p>
             <p>🇷🇼 Contributing to Rwanda's Vision 2050</p>
         </div>
     """, unsafe_allow_html=True)
@@ -178,11 +178,20 @@ def display_register_form():
             phone = st.text_input("Phone Number", placeholder="+250 XXX XXX XXX")
             region = st.selectbox("Region", ["", "Kigali", "Northern", "Southern", "Eastern", "Western"])
 
-        role = st.selectbox(
-            "I am a...",
-            ["user", "researcher", "policymaker"],
-            help="Select your role (admin accounts require special approval)"
-        )
+            role = st.selectbox(
+                "I am a...",
+                [
+                    "user",
+                    "researcher",
+                    "policymaker",
+                    "admin",
+                    "Local government official",
+                    "Private sector (Employer)",
+                    "Education (Vocational officer)",
+                    "NGO representative"
+                ],
+                help="Select your role (admin accounts require special approval)"
+            )
 
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:

@@ -321,6 +321,112 @@ class UserDatabase:
             st.error(f"Error fetching statistics: {e}")
             return {}
 
+    def get_all_users(self) -> List[Dict]:
+        """Return all users as a list of dicts"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT id, username, email, full_name, role, organization,
+                       phone, region, created_at, last_login, is_active
+                FROM users
+                ORDER BY created_at DESC
+            ''')
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            users = []
+            for r in rows:
+                users.append({
+                    'id': r[0],
+                    'username': r[1],
+                    'email': r[2],
+                    'full_name': r[3],
+                    'role': r[4],
+                    'organization': r[5],
+                    'phone': r[6],
+                    'region': r[7],
+                    'created_at': r[8],
+                    'last_login': r[9],
+                    'is_active': bool(r[10])
+                })
+
+            return users
+
+        except Exception as e:
+            st.error(f"Error fetching all users: {e}")
+            return []
+
+    def get_all_contributions(self) -> List[Dict]:
+        """Return all contributions with user info"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                SELECT uc.id, uc.user_id, u.username, u.full_name, uc.contribution_type,
+                       uc.data_json, uc.submitted_at, uc.status
+                FROM user_contributions uc
+                LEFT JOIN users u ON uc.user_id = u.id
+                ORDER BY uc.submitted_at DESC
+            ''')
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            contributions = []
+            for r in rows:
+                try:
+                    data = json.loads(r[5]) if r[5] else {}
+                except Exception:
+                    data = {'raw': r[5]}
+
+                contributions.append({
+                    'id': r[0],
+                    'user_id': r[1],
+                    'username': r[2],
+                    'full_name': r[3],
+                    'type': r[4],
+                    'data': data,
+                    'submitted_at': r[6],
+                    'status': r[7]
+                })
+
+            return contributions
+
+        except Exception as e:
+            st.error(f"Error fetching contributions: {e}")
+            return []
+
+    def update_contribution_status(self, contribution_id: int, new_status: str) -> bool:
+        """Update the status of a contribution (admin action)"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                UPDATE user_contributions
+                SET status = ?
+                WHERE id = ?
+            ''', (new_status, contribution_id))
+
+            conn.commit()
+            conn.close()
+
+            # Log admin action (user_id unknown here)
+            try:
+                self.log_activity(None, 'contribution_update', f'Contribution {contribution_id} status set to {new_status}')
+            except Exception:
+                pass
+
+            return True
+
+        except Exception as e:
+            st.error(f"Error updating contribution status: {e}")
+            return False
+
 
 class AuthenticationUI:
     """Streamlit UI components for authentication"""
@@ -377,7 +483,16 @@ class AuthenticationUI:
                 region = st.selectbox("Region", ["", "Kigali", "Northern", "Southern",
                                                   "Eastern", "Western"])
 
-            role = st.selectbox("Role", ["user", "researcher", "policymaker", "admin"])
+                role = st.selectbox("Role", [
+                    "user",
+                    "researcher",
+                    "policymaker",
+                    "admin",
+                    "Local government official",
+                    "Private sector (Employer)",
+                    "Education (Vocational officer)",
+                    "NGO representative"
+                ])
 
             submit = st.form_submit_button("Register")
 
