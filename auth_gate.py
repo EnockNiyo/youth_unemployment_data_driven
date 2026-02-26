@@ -184,7 +184,7 @@ def display_register_form():
                     "user",
                     "researcher",
                     "policymaker",
-                    "admin",
+                    # "admin",
                     "Local government official",
                     "Private sector (Employer)",
                     "Education (Vocational officer)",
